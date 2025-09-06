@@ -1,0 +1,40 @@
+{
+	"schemaVersion": 1,
+	"id": "hurl",
+	"version": "${version}",
+	"name": "Hurl",
+	"description": "Hurl makes adds a unique new throwable weapon in the form of maces. Some enchantments have also been added to the mace to add some variety to the new mechanic.",
+	"authors": [
+		"Yyasso"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/hurl/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"net.yyasso.hurl.Hurl"
+		],
+		"fabric-datagen": [
+			"net.yyasso.hurl.HurlDataGenerator"
+		],
+		"client":[
+			"net.yyasso.hurl.HurlClient"
+		]
+	},
+	"mixins": [
+		"hurl.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.17.2",
+		"minecraft": "~1.21.8",
+		"java": ">=21",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"another-mod": "*"
+	}
+}

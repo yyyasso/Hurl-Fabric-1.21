@@ -9,9 +9,9 @@
 	],
 	"contact": {
 		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"sources": "https://github.com/yyyasso/Hurl-Fabric-1.21.8"
 	},
-	"license": "CC0-1.0",
+	"license": "MIT",
 	"icon": "assets/hurl/icon.png",
 	"environment": "*",
 	"entrypoints": {

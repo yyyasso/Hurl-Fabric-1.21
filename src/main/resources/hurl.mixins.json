@@ -1,14 +1,14 @@
 {
-	"required": true,
-	"package": "net.yyasso.hurl.mixin",
-	"compatibilityLevel": "JAVA_21",
-	"mixins": [
-		"ExampleMixin"
-	],
-	"injectors": {
-		"defaultRequire": 1
-	},
-	"overwrites": {
-		"requireAnnotations": true
+  "required": true,
+  "package": "net.yyasso.hurl.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "MaceItemsMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
 	}
 }

@@ -1,5 +1,6 @@
 package net.yyasso.hurl.mace;
 
+import com.mojang.serialization.Codec;
 import net.minecraft.block.*;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.Enchantments;
@@ -12,6 +13,7 @@ import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.PersistentProjectileEntity;
+import net.minecraft.fluid.Fluids;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.particle.ParticleTypes;
@@ -34,19 +36,19 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public class MaceEntity extends PersistentProjectileEntity {
-    public static final float MACE_HEIGHT = 0.5F;
-    public static final float MACE_WIDTH = 0.5F;
+    public static final float MACE_HEIGHT = 0.55F;
+    public static final float MACE_WIDTH = 0.55F;
 
     private static final TrackedData<Byte> LOYALTY = DataTracker.registerData(MaceEntity.class, TrackedDataHandlerRegistry.BYTE);
     private static final TrackedData<Byte> FIRE_ASPECT = DataTracker.registerData(MaceEntity.class, TrackedDataHandlerRegistry.BYTE);
     private static final TrackedData<Boolean> ENCHANTED = DataTracker.registerData(MaceEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
-    private static final TrackedData<Byte> PIERCE_LEVEL = DataTracker.registerData(MaceEntity.class, TrackedDataHandlerRegistry.BYTE);
-    private byte windBursts;
-    private static final boolean DEFAULT_DEALT_DAMAGE = false;
-    private boolean dealtDamage = false;
-    private double lastPeak;
+    private static final TrackedData<Byte> WIND_BURSTS = DataTracker.registerData(MaceEntity.class, TrackedDataHandlerRegistry.BYTE);
+    private final Supplier<Byte> defaultWindBurstsSupplier = () -> (byte) 0;
+    public boolean dealtDamage = false;
+    public double lastPeak;
     public int returnTimer;
 
     public MaceEntity(EntityType<? extends MaceEntity> entityType, World world) {
@@ -58,8 +60,7 @@ public class MaceEntity extends PersistentProjectileEntity {
         this.dataTracker.set(LOYALTY, this.getLoyalty(stack));
         this.dataTracker.set(FIRE_ASPECT, this.getFireAspect(stack));
         this.dataTracker.set(ENCHANTED, stack.hasGlint());
-        this.dataTracker.set(PIERCE_LEVEL, (byte)5);
-        this.windBursts = this.getWindBurstLevel(stack);
+        this.dataTracker.set(WIND_BURSTS, this.getWindBurstLevel(stack));
         this.setPeak();
         this.ignite();
     }
@@ -69,8 +70,7 @@ public class MaceEntity extends PersistentProjectileEntity {
         this.dataTracker.set(LOYALTY, this.getLoyalty(stack));
         this.dataTracker.set(FIRE_ASPECT, this.getFireAspect(stack));
         this.dataTracker.set(ENCHANTED, stack.hasGlint());
-        this.dataTracker.set(PIERCE_LEVEL, (byte)5);
-        this.windBursts = this.getWindBurstLevel(stack);
+        this.dataTracker.set(WIND_BURSTS, this.getWindBurstLevel(stack));
         this.setPeak();
         this.ignite();
     }
@@ -81,7 +81,23 @@ public class MaceEntity extends PersistentProjectileEntity {
         builder.add(LOYALTY, (byte)0);
         builder.add(FIRE_ASPECT, (byte)0);
         builder.add(ENCHANTED, false);
-        builder.add(PIERCE_LEVEL, (byte)5);
+        builder.add(WIND_BURSTS, (byte)0);
+    }
+
+    @Override
+    protected void readCustomData(ReadView view) {
+        super.readCustomData(view);
+        this.dealtDamage = view.getBoolean("DealtDamage", false);
+        this.dataTracker.set(WIND_BURSTS, view.read("WindBursts", Codec.BYTE).orElseGet(defaultWindBurstsSupplier));
+        this.dataTracker.set(LOYALTY, this.getLoyalty(this.getItemStack()));
+        this.dataTracker.set(FIRE_ASPECT, this.getFireAspect(this.getItemStack()));
+    }
+
+    @Override
+    protected void writeCustomData(WriteView view) {
+        super.writeCustomData(view);
+        view.putByte("WindBursts", this.getWindBursts());
+        view.putBoolean("DealtDamage", this.dealtDamage);
     }
 
     @Override
@@ -126,13 +142,21 @@ public class MaceEntity extends PersistentProjectileEntity {
             }
         }
 
+        if (this.getVelocity().getY() < 0.0 && this.getVelocity().getY() > -0.7 && getWindBursts() > 0) {
+            tryWindBurstSkip();
+        }
+
         super.tick();
         if (this.isTouchingWater()) { this.setVelocity(this.getVelocity().multiply(1, 1.15F, 1)); }
     }
 
     private boolean isOwnerAlive() {
         Entity entity = this.getOwner();
-        return entity == null || !entity.isAlive() ? false : !(entity instanceof ServerPlayerEntity) || !entity.isSpectator();
+        if (entity != null && entity.isAlive()) {
+            return !(entity instanceof ServerPlayerEntity) || !entity.isSpectator();
+        } else {
+            return false;
+        }
     }
 
     public boolean isEnchanted() {
@@ -192,14 +216,14 @@ public class MaceEntity extends PersistentProjectileEntity {
                 this.onFireAspectEntityHit(entityHitResult);
             }
 
-            if (this.windBursts > 1) {
+            if (getWindBursts() > 1) {
                 this.onWindBurstEntityHit(entityHitResult);
                 this.createWindBurst();
             }
 
             if (entity instanceof LivingEntity livingEntity) {
                 this.knockback(livingEntity, damageSource);
-                if (this.windBursts == 1) { this.createWindBurst(); }
+                if (getWindBursts() == 1) { this.createWindBurst(); }
                 this.onHit(livingEntity);
             }
         }
@@ -221,8 +245,8 @@ public class MaceEntity extends PersistentProjectileEntity {
         }
         this.playSound(this.getBlockHitSound(), 2.0F, 1.2F / (this.random.nextFloat() * 0.2F + 0.9F));
 
-        if (this.isInFluid()) { this.windBursts = 0; }
-        if (this.windBursts > 1 || (this.windBursts == 1 && blockHitResult.getSide() != Direction.UP)) {
+        if (this.isInFluid()) { this.dataTracker.set(WIND_BURSTS, (byte) 0); }
+        if (getWindBursts() > 1 || (getWindBursts() == 1 && blockHitResult.getSide() != Direction.UP)) {
             this.onWindBurstBlockHit(blockHitResult);
             this.createWindBurst();
             return;
@@ -235,10 +259,21 @@ public class MaceEntity extends PersistentProjectileEntity {
                 this.onFireAspectBlockHit(blockHitResult);
                 this.setPeak();
             }
-
+            // Smash through glasslike blocks functionality
+            /*
+            if (this.doMaceSmash() && world.getBlockState(blockHitResult.getBlockPos()).isIn(TagKey.of(RegistryKeys.BLOCK, Identifier.of(Hurl.MOD_ID, "mace_smashable_blocks")))) {
+                if (world.getBlockState(blockHitResult.getBlockPos()).isIn(BlockTags.ICE)) {
+                    world.setBlockState(blockHitResult.getBlockPos(), Blocks.WATER.getDefaultState());
+                } else {
+                    world.setBlockState(blockHitResult.getBlockPos(), Blocks.AIR.getDefaultState());
+                }
+                this.setVelocity(this.getVelocity().multiply(1, 0.9, 1));
+                return;
+            }
+             */
             super.onBlockHit(blockHitResult);
             this.setSound(SoundEvents.INTENTIONALLY_EMPTY);
-            if (this.windBursts == 1) { this.createWindBurst(); }
+            if (getWindBursts() == 1) { this.createWindBurst(); }
             if (world.getBlockState(blockHitResult.getBlockPos()).getBlock() instanceof AirBlock) { this.setInGround(false); }
         }
     }
@@ -278,7 +313,19 @@ public class MaceEntity extends PersistentProjectileEntity {
         this.bounceMace(hitSide.getDoubleVector().normalize(), 0.85, this.getWindBurstBounceScaling());
 
         this.playSound(this.getSound(), 1.0F, 1.2F / (this.random.nextFloat() * 0.2F + 0.9F));
-        this.shake = 3 * this.windBursts;
+        this.shake = 3 * getWindBursts();
+    }
+
+    protected void tryWindBurstSkip() {
+        World world = this.getWorld();
+        Vec3d footPos = this.getPos();
+        Vec3d headPos = this.getPos().add(0, MACE_HEIGHT, 0);
+
+        if (world.getFluidState(BlockPos.ofFloored(footPos)).getFluid() != Fluids.EMPTY
+                && world.getFluidState(BlockPos.ofFloored(headPos)).getFluid() == Fluids.EMPTY) {
+            this.bounceMace(Direction.UP.getDoubleVector(), 1.01, 0.99);
+            this.createSmallWindBurst();
+        }
     }
 
     protected void onWindBurstEntityHit(EntityHitResult entityHitResult) {
@@ -287,7 +334,7 @@ public class MaceEntity extends PersistentProjectileEntity {
 
         this.bounceMace(this.getPos().subtract(center).normalize(), 0.85, this.getWindBurstBounceScaling());
 
-        this.shake = 3 * this.windBursts;
+        this.shake = 3 * getWindBursts();
     }
 
     protected void onFireAspectBlockHit(BlockHitResult blockHitResult) {
@@ -356,23 +403,6 @@ public class MaceEntity extends PersistentProjectileEntity {
     }
 
     @Override
-    protected void readCustomData(ReadView view) {
-        super.readCustomData(view);
-        this.dealtDamage = view.getBoolean("DealtDamage", false);
-        this.windBursts = view.getByte("WindBursts", (byte) 0);
-        this.dataTracker.set(LOYALTY, this.getLoyalty(this.getItemStack()));
-        this.dataTracker.set(FIRE_ASPECT, this.getFireAspect(this.getItemStack()));
-    }
-
-    @Override
-    protected void writeCustomData(WriteView view) {
-        super.writeCustomData(view);
-        view.putBoolean("DealtDamage", this.dealtDamage);
-        view.putByte("WindBursts", this.windBursts);
-
-    }
-
-    @Override
     public byte getPierceLevel() {
         return (byte)12;
     }
@@ -397,16 +427,20 @@ public class MaceEntity extends PersistentProjectileEntity {
                 : 0;
     }
 
+    public byte getWindBursts() {
+        return this.dataTracker.get(WIND_BURSTS);
+    }
+
     public float getWindBurstRadius() {
-        return (this.windBursts > 0 ? (this.windBursts * 0.45F) + 0.8F : 0) + (this.doMaceSmash() ? 0.8F : 0);
+        return (getWindBursts() > 0 ? (getWindBursts() * 0.45F) + 0.8F : 0) + (this.doMaceSmash() ? 0.8F : 0);
     }
 
     public float getWindBurstKnockback() {
-        return (this.windBursts > 0 ? (this.windBursts * 0.35F) + 0.6F : 0)  + (this.doMaceSmash() ? 0.2F : 0);
+        return (getWindBursts() > 0 ? (getWindBursts() * 0.35F) + 0.6F : 0)  + (this.doMaceSmash() ? 0.2F : 0);
     }
 
     public float getWindBurstBounceScaling() {
-        return (this.windBursts > 0 ? 0.85F + (this.windBursts * 0.02F) : 0) + (this.doMaceSmash() ? 0.06F : 0);
+        return (getWindBursts() > 0 ? 0.85F + (getWindBursts() * 0.02F) : 0) + (this.doMaceSmash() ? 0.06F : 0);
     }
 
     public void bounceMace(Vec3d surfaceNormal, double velocityScaling) {
@@ -440,7 +474,31 @@ public class MaceEntity extends PersistentProjectileEntity {
                 ParticleTypes.GUST_EMITTER_LARGE,
                 SoundEvents.ENTITY_WIND_CHARGE_WIND_BURST
         );
-        this.windBursts -= 1;
+        byte decrementedWindBursts = (byte) (getWindBursts() - 1);
+        this.dataTracker.set(WIND_BURSTS, decrementedWindBursts);
+    }
+
+    public void createSmallWindBurst() {
+        this.getWorld().createExplosion(
+                this,
+                this.getDamageSources().windCharge(this, (LivingEntity) this.getOwner()),
+                new AdvancedExplosionBehavior(
+                        true,
+                        false,
+                        Optional.of(this.getWindBurstKnockback()),
+                        Registries.BLOCK.getOptional(BlockTags.BLOCKS_WIND_CHARGE_EXPLOSIONS).map(Function.identity())),
+                this.getPos().getX(),
+                this.getPos().getY(),
+                this.getPos().getZ(),
+                this.getWindBurstRadius(),
+                false,
+                World.ExplosionSourceType.TRIGGER,
+                ParticleTypes.GUST_EMITTER_SMALL,
+                ParticleTypes.GUST_EMITTER_SMALL,
+                SoundEvents.ENTITY_WIND_CHARGE_WIND_BURST
+        );
+        byte decrementedWindBursts = (byte) (getWindBursts() - 1);
+        this.dataTracker.set(WIND_BURSTS, decrementedWindBursts);
     }
 
     private byte getFireAspect(ItemStack stack) {

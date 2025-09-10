@@ -1,4 +1,7 @@
 {
+  "tags.enchantment.exclusive_set.mace_smash": "Mace Smash Exclusive Enchantments",
+  "tags.item.enchantable.throwable_weapon": "Throwable Weapons",
+
   "death.attack.falling_mace": "%1$s was flattened by %2$s",
   "death.attack.falling_mace.item": "%1$s was flattened by %2$s with %3$s"
 }

@@ -87,6 +87,7 @@ public class MaceEntity extends PersistentProjectileEntity {
     @Override
     protected void readCustomData(ReadView view) {
         super.readCustomData(view);
+        this.setPeak(view.getDouble("LastPeak", this.getPos().getY()));
         this.dealtDamage = view.getBoolean("DealtDamage", false);
         this.dataTracker.set(WIND_BURSTS, view.read("WindBursts", Codec.BYTE).orElseGet(defaultWindBurstsSupplier));
         this.dataTracker.set(LOYALTY, this.getLoyalty(this.getItemStack()));
@@ -96,6 +97,7 @@ public class MaceEntity extends PersistentProjectileEntity {
     @Override
     protected void writeCustomData(WriteView view) {
         super.writeCustomData(view);
+        view.putDouble("LastPeak", this.lastPeak);
         view.putByte("WindBursts", this.getWindBursts());
         view.putBoolean("DealtDamage", this.dealtDamage);
     }
@@ -408,7 +410,11 @@ public class MaceEntity extends PersistentProjectileEntity {
     }
 
     public void setPeak() {
-        this.lastPeak = this.getPos().getY();
+        setPeak(this.getPos().getY());
+    }
+
+    public void setPeak(double val) {
+        this.lastPeak = val;
     }
 
     public void ignite() {

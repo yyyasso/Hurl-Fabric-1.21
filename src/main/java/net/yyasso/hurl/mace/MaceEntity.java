@@ -35,6 +35,7 @@ import net.yyasso.hurl.registry.HurlDamageTypes;
 import net.yyasso.hurl.registry.HurlEntityType;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -196,7 +197,7 @@ public class MaceEntity extends PersistentProjectileEntity {
             }
 
             if (this.getEntityWorld() instanceof ServerWorld serverWorld) {
-                f = (float)(g + EnchantmentHelper.getSmashDamagePerFallenBlock(serverWorld, this.getWeaponStack(), entity, damageSource, 0.0F) * fDis * 0.4);
+                f = (float)(g + EnchantmentHelper.getSmashDamagePerFallenBlock(serverWorld, Objects.requireNonNull(this.getWeaponStack()), entity, damageSource, 0.0F) * fDis * 0.4);
                 f = EnchantmentHelper.getDamage(serverWorld, this.getWeaponStack(), entity, damageSource, f);
             }
         }
@@ -231,7 +232,6 @@ public class MaceEntity extends PersistentProjectileEntity {
             }
         }
 
-        this.setVelocity(this.getVelocity().multiply(0.8, 1.0, 0.8));
         this.playSound(SoundEvents.ITEM_MACE_SMASH_AIR, 0.85F, 1.0F);
     }
 

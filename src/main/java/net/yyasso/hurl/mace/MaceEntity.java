@@ -25,6 +25,7 @@ import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.storage.ReadView;
 import net.minecraft.storage.WriteView;
+import net.minecraft.util.collection.Pool;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.math.*;
@@ -87,7 +88,7 @@ public class MaceEntity extends PersistentProjectileEntity {
     @Override
     protected void readCustomData(ReadView view) {
         super.readCustomData(view);
-        this.setPeak(view.getDouble("LastPeak", this.getPos().getY()));
+        this.setPeak(view.getDouble("LastPeak", this.getEntityPos().getY()));
         this.dealtDamage = view.getBoolean("DealtDamage", false);
         this.dataTracker.set(WIND_BURSTS, view.read("WindBursts", Codec.BYTE).orElseGet(defaultWindBurstsSupplier));
         this.dataTracker.set(LOYALTY, this.getLoyalty(this.getItemStack()));
@@ -120,19 +121,19 @@ public class MaceEntity extends PersistentProjectileEntity {
         int i = this.dataTracker.get(LOYALTY);
         if (i > 0 && (this.dealtDamage || this.isNoClip()) && entity != null) {
             if (!this.isOwnerAlive()) {
-                if (this.getWorld() instanceof ServerWorld serverWorld && this.pickupType == PersistentProjectileEntity.PickupPermission.ALLOWED) {
+                if (this.getEntityWorld() instanceof ServerWorld serverWorld && this.pickupType == PersistentProjectileEntity.PickupPermission.ALLOWED) {
                     this.dropStack(serverWorld, this.asItemStack(), 0.1F);
                 }
 
                 this.discard();
             } else {
-                if (!(entity instanceof PlayerEntity) && this.getPos().distanceTo(entity.getEyePos()) < entity.getWidth() + 1.0) {
+                if (!(entity instanceof PlayerEntity) && this.getEntityPos().distanceTo(entity.getEyePos()) < entity.getWidth() + 1.0) {
                     this.discard();
                     return;
                 }
 
                 this.setNoClip(true);
-                Vec3d vec3d = entity.getEyePos().subtract(this.getPos());
+                Vec3d vec3d = entity.getEyePos().subtract(this.getEntityPos());
                 this.setPos(this.getX(), this.getY() + vec3d.y * 0.015 * i, this.getZ());
                 double d = 0.05 * i;
                 this.setVelocity(this.getVelocity().multiply(0.95).add(vec3d.normalize().multiply(d)));
@@ -194,7 +195,7 @@ public class MaceEntity extends PersistentProjectileEntity {
                 g = 25.0 + fDis - 15;
             }
 
-            if (this.getWorld() instanceof ServerWorld serverWorld) {
+            if (this.getEntityWorld() instanceof ServerWorld serverWorld) {
                 f = (float)(g + EnchantmentHelper.getSmashDamagePerFallenBlock(serverWorld, this.getWeaponStack(), entity, damageSource, 0.0F) * fDis * 0.4);
                 f = EnchantmentHelper.getDamage(serverWorld, this.getWeaponStack(), entity, damageSource, f);
             }
@@ -207,7 +208,7 @@ public class MaceEntity extends PersistentProjectileEntity {
                 return;
             }
 
-            if (this.getWorld() instanceof ServerWorld serverWorld) {
+            if (this.getEntityWorld() instanceof ServerWorld serverWorld) {
                 EnchantmentHelper.onTargetDamaged(serverWorld, entity, damageSource, this.getWeaponStack(), item -> this.kill(serverWorld));
                 if (serverWorld.isThundering() && serverWorld.isSkyVisible(this.getBlockPos()) && this.doMaceSmash()) {
                     HurlMaceItem.trySpawnChannelingLightningBolt(this.getWeaponStack(), this.getBlockPos(), this);
@@ -230,13 +231,13 @@ public class MaceEntity extends PersistentProjectileEntity {
             }
         }
 
-        this.setVelocity(this.getVelocity().multiply(0.75, 0.85, 0.75));
-        this.playSound(SoundEvents.ITEM_MACE_SMASH_AIR, 1.0F, 1.0F);
+        this.setVelocity(this.getVelocity().multiply(0.8, 1.0, 0.8));
+        this.playSound(SoundEvents.ITEM_MACE_SMASH_AIR, 0.85F, 1.0F);
     }
 
     @Override
     protected void onBlockHit(BlockHitResult blockHitResult) {
-        World world = this.getWorld();
+        World world = this.getEntityWorld();
         if (doMaceSmash()) {
             HurlMaceItem.knockbackNearbyEntitiesThrown(world, this);
             this.updateSupportingBlockPos(this.isOnGround(), this.getMovement());
@@ -281,36 +282,36 @@ public class MaceEntity extends PersistentProjectileEntity {
     }
 
     protected void onNonTopBlockHit(BlockHitResult blockHitResult) {
-        BlockState blockState = this.getWorld().getBlockState(blockHitResult.getBlockPos());
-        blockState.onProjectileHit(this.getWorld(), blockState, blockHitResult, this);
+        BlockState blockState = this.getEntityWorld().getBlockState(blockHitResult.getBlockPos());
+        blockState.onProjectileHit(this.getEntityWorld(), blockState, blockHitResult, this);
 
         ItemStack itemStack = this.getWeaponStack();
-        if (this.getWorld() instanceof ServerWorld serverWorld && itemStack != null) {
+        if (this.getEntityWorld() instanceof ServerWorld serverWorld && itemStack != null) {
             this.onBlockHitEnchantmentEffects(serverWorld, blockHitResult, itemStack);
         }
 
         Direction hitSide = blockHitResult.getSide();
         Vec3d v = this.getVelocity();
         Vec3d offset = new Vec3d(Math.signum(v.x), Math.signum(v.y), Math.signum(v.z));
-        this.setPosition(this.getPos().subtract(offset.multiply(0.05F)));
+        this.setPosition(this.getEntityPos().subtract(offset.multiply(0.05F)));
 
         this.bounceMace(hitSide.getDoubleVector().normalize(), 0.6, 0.6);
         this.playSound(SoundEvents.ITEM_MACE_SMASH_AIR, 1.0F, 1.2F / (this.random.nextFloat() * 0.2F + 0.9F));
     }
 
     protected void onWindBurstBlockHit(BlockHitResult blockHitResult) {
-        BlockState blockState = this.getWorld().getBlockState(blockHitResult.getBlockPos());
-        blockState.onProjectileHit(this.getWorld(), blockState, blockHitResult, this);
+        BlockState blockState = this.getEntityWorld().getBlockState(blockHitResult.getBlockPos());
+        blockState.onProjectileHit(this.getEntityWorld(), blockState, blockHitResult, this);
 
         ItemStack itemStack = this.getWeaponStack();
-        if (this.getWorld() instanceof ServerWorld serverWorld && itemStack != null) {
+        if (this.getEntityWorld() instanceof ServerWorld serverWorld && itemStack != null) {
             this.onBlockHitEnchantmentEffects(serverWorld, blockHitResult, itemStack);
         }
 
         Direction hitSide = blockHitResult.getSide();
         Vec3d v = this.getVelocity();
         Vec3d offset = new Vec3d(Math.signum(v.x), Math.signum(v.y), Math.signum(v.z));
-        this.setPosition(this.getPos().subtract(offset.multiply(0.2F)));
+        this.setPosition(this.getEntityPos().subtract(offset.multiply(0.2F)));
 
         this.bounceMace(hitSide.getDoubleVector().normalize(), 0.85, this.getWindBurstBounceScaling());
 
@@ -319,9 +320,9 @@ public class MaceEntity extends PersistentProjectileEntity {
     }
 
     protected void tryWindBurstSkip() {
-        World world = this.getWorld();
-        Vec3d footPos = this.getPos();
-        Vec3d headPos = this.getPos().add(0, MACE_HEIGHT, 0);
+        World world = this.getEntityWorld();
+        Vec3d footPos = this.getEntityPos();
+        Vec3d headPos = this.getEntityPos().add(0, MACE_HEIGHT, 0);
 
         if (world.getFluidState(BlockPos.ofFloored(footPos)).getFluid() != Fluids.EMPTY
                 && world.getFluidState(BlockPos.ofFloored(headPos)).getFluid() == Fluids.EMPTY) {
@@ -334,13 +335,13 @@ public class MaceEntity extends PersistentProjectileEntity {
         Entity entity = entityHitResult.getEntity();
         Vec3d center = entity.getBoundingBox().getCenter();
 
-        this.bounceMace(this.getPos().subtract(center).normalize(), 0.85, this.getWindBurstBounceScaling());
+        this.bounceMace(this.getEntityPos().subtract(center).normalize(), 0.85, this.getWindBurstBounceScaling());
 
         this.shake = 3 * getWindBursts();
     }
 
     protected void onFireAspectBlockHit(BlockHitResult blockHitResult) {
-        if ( !this.doMaceSmash()) {this.createFireBurst(-2, 0.5F, false); }
+        if ( !this.doMaceSmash()) {this.createFireBurst(-2, 0.25F, false); }
         else { this.createFireBurst(-2, this.getFireBurstRadius(), true); }
     }
 
@@ -350,7 +351,7 @@ public class MaceEntity extends PersistentProjectileEntity {
     }
 
     public double getFallDistance() {
-        return (this.lastPeak - this.getPos().getY());
+        return (this.lastPeak - this.getEntityPos().getY());
     }
 
     public boolean doMaceSmash() {
@@ -406,11 +407,11 @@ public class MaceEntity extends PersistentProjectileEntity {
 
     @Override
     public byte getPierceLevel() {
-        return (byte)12;
+        return (byte)14;
     }
 
     public void setPeak() {
-        setPeak(this.getPos().getY());
+        setPeak(this.getEntityPos().getY());
     }
 
     public void setPeak(double val) {
@@ -422,13 +423,13 @@ public class MaceEntity extends PersistentProjectileEntity {
     }
 
     private byte getLoyalty(ItemStack stack) {
-        return this.getWorld() instanceof ServerWorld serverWorld
+        return this.getEntityWorld() instanceof ServerWorld serverWorld
                 ? (byte)MathHelper.clamp(EnchantmentHelper.getTridentReturnAcceleration(serverWorld, stack, this), 0, 127)
                 : 0;
     }
 
     private byte getWindBurstLevel(ItemStack stack) {
-        return this.getWorld() instanceof ServerWorld serverWorld
+        return this.getEntityWorld() instanceof ServerWorld serverWorld
                 ? (byte) EnchantmentHelper.getLevel(serverWorld.getRegistryManager().getEntryOrThrow(Enchantments.WIND_BURST), stack)
                 : 0;
     }
@@ -462,7 +463,7 @@ public class MaceEntity extends PersistentProjectileEntity {
     }
 
     public void createWindBurst() {
-        this.getWorld().createExplosion(
+        this.getEntityWorld().createExplosion(
                 this,
                 this.getDamageSources().windCharge(this, (LivingEntity) this.getOwner()),
                 new AdvancedExplosionBehavior(
@@ -470,22 +471,24 @@ public class MaceEntity extends PersistentProjectileEntity {
                         false,
                         Optional.of(this.getWindBurstKnockback()),
                         Registries.BLOCK.getOptional(BlockTags.BLOCKS_WIND_CHARGE_EXPLOSIONS).map(Function.identity())),
-                this.getPos().getX(),
-                this.getPos().getY(),
-                this.getPos().getZ(),
+                this.getEntityPos().getX(),
+                this.getEntityPos().getY(),
+                this.getEntityPos().getZ(),
                 this.getWindBurstRadius(),
                 false,
                 World.ExplosionSourceType.TRIGGER,
                 ParticleTypes.GUST_EMITTER_SMALL,
                 ParticleTypes.GUST_EMITTER_LARGE,
+                Pool.empty(),
                 SoundEvents.ENTITY_WIND_CHARGE_WIND_BURST
         );
+
         byte decrementedWindBursts = (byte) (getWindBursts() - 1);
         this.dataTracker.set(WIND_BURSTS, decrementedWindBursts);
     }
 
     public void createSmallWindBurst() {
-        this.getWorld().createExplosion(
+        this.getEntityWorld().createExplosion(
                 this,
                 this.getDamageSources().windCharge(this, (LivingEntity) this.getOwner()),
                 new AdvancedExplosionBehavior(
@@ -493,14 +496,15 @@ public class MaceEntity extends PersistentProjectileEntity {
                         false,
                         Optional.of(this.getWindBurstKnockback()),
                         Registries.BLOCK.getOptional(BlockTags.BLOCKS_WIND_CHARGE_EXPLOSIONS).map(Function.identity())),
-                this.getPos().getX(),
-                this.getPos().getY(),
-                this.getPos().getZ(),
+                this.getEntityPos().getX(),
+                this.getEntityPos().getY(),
+                this.getEntityPos().getZ(),
                 this.getWindBurstRadius(),
                 false,
                 World.ExplosionSourceType.TRIGGER,
                 ParticleTypes.GUST_EMITTER_SMALL,
                 ParticleTypes.GUST_EMITTER_SMALL,
+                Pool.empty(),
                 SoundEvents.ENTITY_WIND_CHARGE_WIND_BURST
         );
         byte decrementedWindBursts = (byte) (getWindBursts() - 1);
@@ -508,13 +512,13 @@ public class MaceEntity extends PersistentProjectileEntity {
     }
 
     private byte getFireAspect(ItemStack stack) {
-        return this.getWorld() instanceof ServerWorld serverWorld
+        return this.getEntityWorld() instanceof ServerWorld serverWorld
                 ? (byte) EnchantmentHelper.getLevel(serverWorld.getRegistryManager().getEntryOrThrow(Enchantments.FIRE_ASPECT), stack)
                 : 0;
     }
 
     public float getFireBurstRadius() {
-        return (float) ((this.dataTracker.get(FIRE_ASPECT)) + (this.doMaceSmash() ? (this.getFallDistance() - 8.0F) * 0.02F : 0));
+        return (float) ((this.dataTracker.get(FIRE_ASPECT) * 0.9) + (this.doMaceSmash() ? (this.getFallDistance() - 8.0F) * 0.02F : 0));
     }
 
     public int getFireAspectTicks() {
@@ -522,7 +526,7 @@ public class MaceEntity extends PersistentProjectileEntity {
     }
 
     public void createFireBurst(float knockback, float radius, boolean explode) {
-        this.getWorld().createExplosion(
+        this.getEntityWorld().createExplosion(
                 this,
                 null,
                 new AdvancedExplosionBehavior(
@@ -530,18 +534,19 @@ public class MaceEntity extends PersistentProjectileEntity {
                         false,
                         Optional.of(knockback),
                         Registries.BLOCK.getOptional(BlockTags.BLOCKS_WIND_CHARGE_EXPLOSIONS).map(Function.identity())),
-                this.getPos().getX(),
-                this.getPos().getY(),
-                this.getPos().getZ(),
+                this.getEntityPos().getX(),
+                this.getEntityPos().getY(),
+                this.getEntityPos().getZ(),
                 radius,
                 true,
                 World.ExplosionSourceType.NONE,
-                ParticleTypes.FLASH,
-                ParticleTypes.FLASH,
+                ParticleTypes.ASH,
+                ParticleTypes.ASH,
+                Pool.empty(),
                 Registries.SOUND_EVENT.getEntry(SoundEvents.INTENTIONALLY_EMPTY)
         );
         if (explode) {
-            this.getWorld().createExplosion(
+            this.getEntityWorld().createExplosion(
                     this,
                     this.getDamageSources().explosion(this, this.getOwner()),
                     new AdvancedExplosionBehavior(
@@ -549,14 +554,15 @@ public class MaceEntity extends PersistentProjectileEntity {
                             false,
                             Optional.empty(),
                             Registries.BLOCK.getOptional(BlockTags.BLOCKS_WIND_CHARGE_EXPLOSIONS).map(Function.identity())),
-                    this.getPos().getX(),
-                    this.getPos().getY(),
-                    this.getPos().getZ(),
+                    this.getEntityPos().getX(),
+                    this.getEntityPos().getY(),
+                    this.getEntityPos().getZ(),
                     0.15F,
                     false,
                     World.ExplosionSourceType.TNT,
-                    ParticleTypes.FLASH,
-                    ParticleTypes.FLASH,
+                    ParticleTypes.EXPLOSION_EMITTER,
+                    ParticleTypes.EXPLOSION_EMITTER,
+                    Pool.empty(),
                     SoundEvents.ENTITY_GENERIC_EXPLODE
             );
         }

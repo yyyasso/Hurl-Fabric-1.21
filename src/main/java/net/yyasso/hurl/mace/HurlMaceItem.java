@@ -60,12 +60,12 @@ public class HurlMaceItem extends Item implements ProjectileItem {
         return AttributeModifiersComponent.builder()
                 .add(
                         EntityAttributes.ATTACK_DAMAGE,
-                        new EntityAttributeModifier(BASE_ATTACK_DAMAGE_MODIFIER_ID, 5.0, EntityAttributeModifier.Operation.ADD_VALUE),
+                        new EntityAttributeModifier(BASE_ATTACK_DAMAGE_MODIFIER_ID, ATTACK_DAMAGE_MODIFIER_VALUE, EntityAttributeModifier.Operation.ADD_VALUE),
                         AttributeModifierSlot.MAINHAND
                 )
                 .add(
                         EntityAttributes.ATTACK_SPEED,
-                        new EntityAttributeModifier(BASE_ATTACK_SPEED_MODIFIER_ID, -3.4F, EntityAttributeModifier.Operation.ADD_VALUE),
+                        new EntityAttributeModifier(BASE_ATTACK_SPEED_MODIFIER_ID, ATTACK_SPEED_MODIFIER_VALUE, EntityAttributeModifier.Operation.ADD_VALUE),
                         AttributeModifierSlot.MAINHAND
                 )
                 .build();
@@ -143,7 +143,7 @@ public class HurlMaceItem extends Item implements ProjectileItem {
     @Override
     public void postHit(ItemStack stack, LivingEntity target, LivingEntity attacker) {
         if (shouldDealAdditionalDamage(attacker)) {
-            ServerWorld serverWorld = (ServerWorld)attacker.getWorld();
+            ServerWorld serverWorld = (ServerWorld)attacker.getEntityWorld();
             attacker.setVelocity(attacker.getVelocity().withAxis(Direction.Axis.Y, 0.01F));
             if (attacker instanceof ServerPlayerEntity serverPlayerEntity) {
                 serverPlayerEntity.currentExplosionImpactPos = this.getCurrentExplosionImpactPos(serverPlayerEntity);
@@ -158,7 +158,7 @@ public class HurlMaceItem extends Item implements ProjectileItem {
                     serverPlayerEntity.setSpawnExtraParticlesOnFall(true);
                 }
 
-                SoundEvent soundEvent = attacker.fallDistance > 5.0 ? SoundEvents.ITEM_MACE_SMASH_GROUND_HEAVY : SoundEvents.ITEM_MACE_SMASH_GROUND;
+                SoundEvent soundEvent = attacker.fallDistance > HEAVY_SMASH_SOUND_FALL_DISTANCE_THRESHOLD ? SoundEvents.ITEM_MACE_SMASH_GROUND_HEAVY : SoundEvents.ITEM_MACE_SMASH_GROUND;
                 serverWorld.playSound(null, attacker.getX(), attacker.getY(), attacker.getZ(), soundEvent, attacker.getSoundCategory(), 1.0F, 1.0F);
             } else {
                 serverWorld.playSound(null, attacker.getX(), attacker.getY(), attacker.getZ(), SoundEvents.ITEM_MACE_SMASH_AIR, attacker.getSoundCategory(), 1.0F, 1.0F);
@@ -185,7 +185,7 @@ public class HurlMaceItem extends Item implements ProjectileItem {
         }
 
         if (attacker != null) {
-            if (attacker.getWorld() instanceof ServerWorld world) {
+            if (attacker.getEntityWorld() instanceof ServerWorld world) {
                 if (world.isThundering() && world.isSkyVisible(pos) && hasChanneling(world, stack)) {
                     LightningEntity lightningEntity = (EntityType.LIGHTNING_BOLT).spawn(world, pos, SpawnReason.TRIGGERED);
                     if (lightningEntity != null) {
@@ -197,7 +197,7 @@ public class HurlMaceItem extends Item implements ProjectileItem {
                         }
 
                         if (attacker.getScoreboardTeam() != null) {
-                            attacker.getWorld().getScoreboard().addScoreHolderToTeam(lightningEntity.getNameForScoreboard(), attacker.getScoreboardTeam());
+                            attacker.getEntityWorld().getScoreboard().addScoreHolderToTeam(lightningEntity.getNameForScoreboard(), attacker.getScoreboardTeam());
                         }
 
                         lightningEntity.refreshPositionAndAngles(pos.getX(), pos.getY(), pos.getZ(), lightningEntity.getYaw(), lightningEntity.getPitch());
@@ -210,9 +210,9 @@ public class HurlMaceItem extends Item implements ProjectileItem {
     private Vec3d getCurrentExplosionImpactPos(ServerPlayerEntity player) {
         return player.shouldIgnoreFallDamageFromCurrentExplosion()
                 && player.currentExplosionImpactPos != null
-                && player.currentExplosionImpactPos.y <= player.getPos().y
+                && player.currentExplosionImpactPos.y <= player.getEntityPos().y
                 ? player.currentExplosionImpactPos
-                : player.getPos();
+                : player.getEntityPos();
     }
 
     @Override
@@ -240,7 +240,7 @@ public class HurlMaceItem extends Item implements ProjectileItem {
                     g = 22.0 + f - 8.0;
                 }
 
-                return livingEntity.getWorld() instanceof ServerWorld serverWorld
+                return livingEntity.getEntityWorld() instanceof ServerWorld serverWorld
                         ? (float)(g + EnchantmentHelper.getSmashDamagePerFallenBlock(serverWorld, livingEntity.getWeaponStack(), target, damageSource, 0.0F) * f)
                         : (float)g;
             }
@@ -251,12 +251,12 @@ public class HurlMaceItem extends Item implements ProjectileItem {
 
     private static void knockbackNearbyEntities(World world, Entity attacker, Entity attacked) {
         world.syncWorldEvent(WorldEvents.SMASH_ATTACK, attacked.getSteppingPos(), 750);
-        world.getEntitiesByClass(LivingEntity.class, attacked.getBoundingBox().expand(3.5), getKnockbackPredicate(attacker, attacked)).forEach(entity -> {
-            Vec3d vec3d = entity.getPos().subtract(attacked.getPos());
+        world.getEntitiesByClass(LivingEntity.class, attacked.getBoundingBox().expand(KNOCKBACK_RANGE), getKnockbackPredicate(attacker, attacked)).forEach(entity -> {
+            Vec3d vec3d = entity.getEntityPos().subtract(attacked.getEntityPos());
             double d = getKnockback(attacker, entity, vec3d);
             Vec3d vec3d2 = vec3d.normalize().multiply(d);
             if (d > 0.0) {
-                entity.addVelocity(vec3d2.x, 0.7F, vec3d2.z);
+                entity.addVelocity(vec3d2.x, KNOCKBACK_POWER, vec3d2.z);
                 if (entity instanceof ServerPlayerEntity serverPlayerEntity) {
                     serverPlayerEntity.networkHandler.sendPacket(new EntityVelocityUpdateS2CPacket(serverPlayerEntity));
                 }
@@ -266,12 +266,12 @@ public class HurlMaceItem extends Item implements ProjectileItem {
 
     public static void knockbackNearbyEntitiesThrown(World world, PersistentProjectileEntity attacker) {
         world.syncWorldEvent(WorldEvents.SMASH_ATTACK, attacker.getSteppingPos(), 750);
-        world.getEntitiesByClass(LivingEntity.class, attacker.getBoundingBox().expand(3.5), getKnockbackPredicateThrown(attacker)).forEach(entity -> {
-            Vec3d vec3d = entity.getPos().subtract(attacker.getPos());
+        world.getEntitiesByClass(LivingEntity.class, attacker.getBoundingBox().expand(KNOCKBACK_RANGE), getKnockbackPredicateThrown(attacker)).forEach(entity -> {
+            Vec3d vec3d = entity.getEntityPos().subtract(attacker.getEntityPos());
             double d = getKnockback(attacker, entity, vec3d);
             Vec3d vec3d2 = vec3d.normalize().multiply(d);
             if (d > 0.0) {
-                entity.addVelocity(vec3d2.x, 0.7F, vec3d2.z);
+                entity.addVelocity(vec3d2.x, KNOCKBACK_POWER, vec3d2.z);
                 if (entity instanceof ServerPlayerEntity serverPlayerEntity) {
                     serverPlayerEntity.networkHandler.sendPacket(new EntityVelocityUpdateS2CPacket(serverPlayerEntity));
                 }
@@ -301,13 +301,13 @@ public class HurlMaceItem extends Item implements ProjectileItem {
                             && tameableEntity.isOwner(livingEntity)
             );
             boolean bl5 = !(entity instanceof ArmorStandEntity armorStandEntity && armorStandEntity.isMarker());
-            boolean bl6 = attacked.squaredDistanceTo(entity) <= Math.pow(3.5, 2.0);
+            boolean bl6 = attacked.squaredDistanceTo(entity) <= Math.pow(KNOCKBACK_RANGE, 2.0);
             return bl && bl2 && bl3 && bl4 && bl5 && bl6;
         };
     }
 
     private static double getKnockback(Entity attacker, LivingEntity attacked, Vec3d distance) {
-        return (3.5 - distance.length()) * 0.7F * (attacker.fallDistance > 5.0 ? 2 : 1) * (1.0 - attacked.getAttributeValue(EntityAttributes.KNOCKBACK_RESISTANCE));
+        return (KNOCKBACK_RANGE - distance.length()) * KNOCKBACK_POWER * (attacker.fallDistance > 5.0 ? 2 : 1) * (1.0 - attacked.getAttributeValue(EntityAttributes.KNOCKBACK_RESISTANCE));
     }
 
     public static boolean shouldDealAdditionalDamage(LivingEntity attacker) {

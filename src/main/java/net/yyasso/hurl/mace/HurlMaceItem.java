@@ -50,7 +50,7 @@ public class HurlMaceItem extends Item implements ProjectileItem {
     private static final float KNOCKBACK_POWER = 0.7F;
 
     public static final int MIN_DRAW_DURATION = 10;
-    public static final float DEFAULT_THROW_SPEED = 0.9F;
+    public static final float DEFAULT_THROW_SPEED = 0.95F;
 
     public HurlMaceItem(Item.Settings settings) {
         super(settings);
@@ -103,8 +103,8 @@ public class HurlMaceItem extends Item implements ProjectileItem {
                         stack.damage(3, playerEntity);
                         ItemStack itemStack = stack.splitUnlessCreative(1, playerEntity);
 
-                        float throwSpeed = DEFAULT_THROW_SPEED - (densityLevel * 0.1F) - (Math.signum(densityLevel) * 0.1F);
-                        if ((world.isThundering() && world.isSkyVisible(user.getBlockPos()) && hasChanneling(serverWorld, stack))) { throwSpeed += 0.9F; }
+                        float throwSpeed = DEFAULT_THROW_SPEED - (densityLevel * 0.1F) - (Math.signum(densityLevel) * 0.15F);
+                        if ((world.isThundering() && world.isSkyVisible(user.getBlockPos()) && hasChanneling(serverWorld, stack))) { throwSpeed += 0.85F; }
                         MaceEntity maceEntity = ProjectileEntity.spawnWithVelocity(MaceEntity::new, serverWorld, itemStack, playerEntity, 0.0F, throwSpeed, 1.0F);
 
                         if (playerEntity.isInCreativeMode()) {

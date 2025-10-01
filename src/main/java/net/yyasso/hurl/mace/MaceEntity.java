@@ -238,15 +238,6 @@ public class MaceEntity extends PersistentProjectileEntity {
     @Override
     protected void onBlockHit(BlockHitResult blockHitResult) {
         World world = this.getEntityWorld();
-        if (doMaceSmash()) {
-            HurlMaceItem.knockbackNearbyEntitiesThrown(world, this);
-            this.updateSupportingBlockPos(this.isOnGround(), this.getMovement());
-
-            if (!this.dealtDamage) {
-                HurlMaceItem.trySpawnChannelingLightningBolt(this.getWeaponStack(), this.getBlockPos(), this);
-            }
-        }
-        this.playSound(this.getBlockHitSound(), 2.0F, 1.2F / (this.random.nextFloat() * 0.2F + 0.9F));
 
         if (this.isInFluid()) { this.dataTracker.set(WIND_BURSTS, (byte) 0); }
         if (getWindBursts() > 1 || (getWindBursts() == 1 && blockHitResult.getSide() != Direction.UP)) {
@@ -257,7 +248,20 @@ public class MaceEntity extends PersistentProjectileEntity {
 
         if (blockHitResult.getSide() != Direction.UP) {
             this.onNonTopBlockHit(blockHitResult);
+            this.playSound(SoundEvents.ITEM_MACE_SMASH_AIR, 1.0F, 0.85F + (this.random.nextFloat() * 0.3F));
         } else {
+            if (doMaceSmash()) {
+                HurlMaceItem.knockbackNearbyEntitiesThrown(world, this);
+                this.updateSupportingBlockPos(this.isOnGround(), this.getMovement());
+
+                if (!this.dealtDamage) {
+                    HurlMaceItem.trySpawnChannelingLightningBolt(this.getWeaponStack(), this.getBlockPos(), this);
+                }
+                this.playSound(SoundEvents.ITEM_MACE_SMASH_GROUND_HEAVY, 2.0F, 0.90F + (this.random.nextFloat() * 0.1F));
+            } else {
+                this.playSound(SoundEvents.ITEM_MACE_SMASH_GROUND_HEAVY, 1.6F, 0.90F + (this.random.nextFloat() * 0.2F));
+            }
+
             if (this.dataTracker.get(FIRE_ASPECT) > 0 && !this.isInFluid()) {
                 this.onFireAspectBlockHit(blockHitResult);
                 this.setPeak();
@@ -296,7 +300,6 @@ public class MaceEntity extends PersistentProjectileEntity {
         this.setPosition(this.getEntityPos().subtract(offset.multiply(0.05F)));
 
         this.bounceMace(hitSide.getDoubleVector().normalize(), 0.6, 0.6);
-        this.playSound(SoundEvents.ITEM_MACE_SMASH_AIR, 1.0F, 1.2F / (this.random.nextFloat() * 0.2F + 0.9F));
     }
 
     protected void onWindBurstBlockHit(BlockHitResult blockHitResult) {
@@ -356,11 +359,6 @@ public class MaceEntity extends PersistentProjectileEntity {
 
     public boolean doMaceSmash() {
         return this.getFallDistance() > 8 && this.getVelocity().y < -0.3;
-    }
-
-    protected SoundEvent getBlockHitSound() {
-        if (doMaceSmash()) { return SoundEvents.ITEM_MACE_SMASH_GROUND; }
-        else { return SoundEvents.ITEM_MACE_SMASH_GROUND_HEAVY; }
     }
 
     @Override

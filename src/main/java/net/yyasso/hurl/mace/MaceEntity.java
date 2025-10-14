@@ -48,9 +48,9 @@ public class MaceEntity extends PersistentProjectileEntity {
     private static final TrackedData<Byte> FIRE_ASPECT = DataTracker.registerData(MaceEntity.class, TrackedDataHandlerRegistry.BYTE);
     private static final TrackedData<Boolean> ENCHANTED = DataTracker.registerData(MaceEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
     private static final TrackedData<Byte> WIND_BURSTS = DataTracker.registerData(MaceEntity.class, TrackedDataHandlerRegistry.BYTE);
+    private static final TrackedData<Float> lastPeak = DataTracker.registerData(MaceEntity.class, TrackedDataHandlerRegistry.FLOAT);
     private final Supplier<Byte> defaultWindBurstsSupplier = () -> (byte) 0;
     public boolean dealtDamage = false;
-    public double lastPeak;
     public int returnTimer;
 
     public MaceEntity(EntityType<? extends MaceEntity> entityType, World world) {
@@ -84,12 +84,13 @@ public class MaceEntity extends PersistentProjectileEntity {
         builder.add(FIRE_ASPECT, (byte)0);
         builder.add(ENCHANTED, false);
         builder.add(WIND_BURSTS, (byte)0);
+        builder.add(lastPeak, (float) 0);
     }
 
     @Override
     protected void readCustomData(ReadView view) {
         super.readCustomData(view);
-        this.setPeak(view.getDouble("LastPeak", this.getEntityPos().getY()));
+        this.dataTracker.set(lastPeak, view.read("LastPeak", Codec.FLOAT).orElseGet(() -> (float) this.getEntityPos().getY()));
         this.dealtDamage = view.getBoolean("DealtDamage", false);
         this.dataTracker.set(WIND_BURSTS, view.read("WindBursts", Codec.BYTE).orElseGet(defaultWindBurstsSupplier));
         this.dataTracker.set(LOYALTY, this.getLoyalty(this.getItemStack()));
@@ -99,7 +100,7 @@ public class MaceEntity extends PersistentProjectileEntity {
     @Override
     protected void writeCustomData(WriteView view) {
         super.writeCustomData(view);
-        view.putDouble("LastPeak", this.lastPeak);
+        view.putFloat("LastPeak", this.dataTracker.get(lastPeak));
         view.putByte("WindBursts", this.getWindBursts());
         view.putBoolean("DealtDamage", this.dealtDamage);
     }
@@ -353,8 +354,8 @@ public class MaceEntity extends PersistentProjectileEntity {
         entity.setFireTicks(this.getFireAspectTicks());
     }
 
-    public double getFallDistance() {
-        return (this.lastPeak - this.getEntityPos().getY());
+    public float getFallDistance() {
+        return (this.dataTracker.get(lastPeak) - (float) this.getEntityPos().getY());
     }
 
     public boolean doMaceSmash() {
@@ -409,11 +410,11 @@ public class MaceEntity extends PersistentProjectileEntity {
     }
 
     public void setPeak() {
-        setPeak(this.getEntityPos().getY());
+        setPeak((float) this.getEntityPos().getY());
     }
 
-    public void setPeak(double val) {
-        this.lastPeak = val;
+    public void setPeak(float val) {
+        this.dataTracker.set(lastPeak, val);
     }
 
     public void ignite() {

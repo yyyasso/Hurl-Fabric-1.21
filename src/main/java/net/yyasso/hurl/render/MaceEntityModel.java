@@ -3,7 +3,7 @@ package net.yyasso.hurl.render;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.model.*;
-import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.RenderLayers;
 import net.minecraft.client.render.entity.model.EntityModelLayer;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.Unit;
@@ -14,8 +14,9 @@ import net.yyasso.hurl.Hurl;
 public class MaceEntityModel extends Model<Unit> {
     public static final Identifier TEXTURE = Identifier.of(Hurl.MOD_ID, "textures/entity/mace.png");
     public static final EntityModelLayer MODEL_LAYER = new EntityModelLayer(Identifier.of(Hurl.MOD_ID, "mace"), "main");
-    public MaceEntityModel(ModelPart root) {
-        super(root, RenderLayer::getEntitySolid);
+
+    public MaceEntityModel(ModelPart root)  {
+        super(root, RenderLayers::entitySolid);
     }
 
     public static TexturedModelData getTexturedModelData() {

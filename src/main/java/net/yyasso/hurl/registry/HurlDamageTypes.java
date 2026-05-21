@@ -1,13 +1,13 @@
 package net.yyasso.hurl.registry;
 
-import net.minecraft.entity.damage.DamageType;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.damagesource.DamageType;
 import net.yyasso.hurl.Hurl;
 
 public class HurlDamageTypes {
-    public static final RegistryKey<DamageType> FALLING_MACE_DAMAGE = RegistryKey.of(RegistryKeys.DAMAGE_TYPE, Identifier.of(Hurl.MOD_ID, "falling_mace"));
+    public static final ResourceKey<DamageType> FALLING_MACE_DAMAGE = ResourceKey.create(Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath(Hurl.MOD_ID, "falling_mace"));
 
     public static void initialize() {}
 }

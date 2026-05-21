@@ -2,49 +2,52 @@ package net.yyasso.hurl.mace;
 
 import java.util.List;
 import java.util.function.Predicate;
-
-import net.minecraft.component.EnchantmentEffectComponentTypes;
-import net.minecraft.component.type.AttributeModifierSlot;
-import net.minecraft.component.type.AttributeModifiersComponent;
-import net.minecraft.component.type.ToolComponent;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.Enchantments;
-import net.minecraft.entity.*;
-import net.minecraft.entity.attribute.EntityAttributeModifier;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.decoration.ArmorStandEntity;
-import net.minecraft.entity.passive.TameableEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.PersistentProjectileEntity;
-import net.minecraft.entity.projectile.ProjectileEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.item.ProjectileItem;
-import net.minecraft.item.consume.UseAction;
-import net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.stat.Stats;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Position;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
-import net.minecraft.world.WorldEvents;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Position;
+import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.stats.Stats;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.entity.LightningBolt;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemUseAnimation;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ProjectileItem;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.item.component.Tool;
+import net.minecraft.world.item.enchantment.EnchantmentEffectComponents;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.LevelEvent;
+import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class HurlMaceItem extends Item implements ProjectileItem {
-    private static final int ATTACK_DAMAGE_MODIFIER_VALUE = 5;
-    private static final float ATTACK_SPEED_MODIFIER_VALUE = -3.4F;
-    public static final float MINING_SPEED_MULTIPLIER = 1.5F;
+    private static final int DEFAULT_ATTACK_DAMAGE = 5;
+    private static final float DEFAULT_ATTACK_SPEED = -3.4F;
     private static final float HEAVY_SMASH_SOUND_FALL_DISTANCE_THRESHOLD = 5.0F;
     public static final float KNOCKBACK_RANGE = 3.5F;
     private static final float KNOCKBACK_POWER = 0.7F;
@@ -52,66 +55,66 @@ public class HurlMaceItem extends Item implements ProjectileItem {
     public static final int MIN_DRAW_DURATION = 10;
     public static final float DEFAULT_THROW_SPEED = 0.95F;
 
-    public HurlMaceItem(Item.Settings settings) {
+    public HurlMaceItem(Item.Properties settings) {
         super(settings);
     }
 
-    public static AttributeModifiersComponent createAttributeModifiers() {
-        return AttributeModifiersComponent.builder()
+    public static ItemAttributeModifiers createAttributeModifiers() {
+        return ItemAttributeModifiers.builder()
                 .add(
-                        EntityAttributes.ATTACK_DAMAGE,
-                        new EntityAttributeModifier(BASE_ATTACK_DAMAGE_MODIFIER_ID, ATTACK_DAMAGE_MODIFIER_VALUE, EntityAttributeModifier.Operation.ADD_VALUE),
-                        AttributeModifierSlot.MAINHAND
+                        Attributes.ATTACK_DAMAGE,
+                        new AttributeModifier(BASE_ATTACK_DAMAGE_ID, DEFAULT_ATTACK_DAMAGE, AttributeModifier.Operation.ADD_VALUE),
+                        EquipmentSlotGroup.MAINHAND
                 )
                 .add(
-                        EntityAttributes.ATTACK_SPEED,
-                        new EntityAttributeModifier(BASE_ATTACK_SPEED_MODIFIER_ID, ATTACK_SPEED_MODIFIER_VALUE, EntityAttributeModifier.Operation.ADD_VALUE),
-                        AttributeModifierSlot.MAINHAND
+                        Attributes.ATTACK_SPEED,
+                        new AttributeModifier(BASE_ATTACK_SPEED_ID, DEFAULT_ATTACK_SPEED, AttributeModifier.Operation.ADD_VALUE),
+                        EquipmentSlotGroup.MAINHAND
                 )
                 .build();
     }
 
-    public static ToolComponent createToolComponent() {
-        return new ToolComponent(List.of(), 1.0F, 2, false);
+    public static Tool createToolComponent() {
+        return new Tool(List.of(), 1.0F, 2, false);
     }
 
     @Override
-    public UseAction getUseAction(ItemStack stack) {
-        return UseAction.TRIDENT;
+    public @NotNull ItemUseAnimation getUseAnimation(@NotNull ItemStack stack) {
+        return ItemUseAnimation.TRIDENT;
     }
 
     @Override
-    public int getMaxUseTime(ItemStack stack, LivingEntity user) {
+    public int getUseDuration(ItemStack stack, LivingEntity user) {
         return 72000;
     }
 
     @Override
-    public boolean onStoppedUsing(ItemStack stack, World world, LivingEntity user, int remainingUseTicks) {
-        if (user instanceof PlayerEntity playerEntity) {
-            int i = this.getMaxUseTime(stack, user) - remainingUseTicks;
+    public boolean releaseUsing(ItemStack stack, Level world, LivingEntity user, int remainingUseTicks) {
+        if (user instanceof Player playerEntity) {
+            int i = this.getUseDuration(stack, user) - remainingUseTicks;
             if (i < 10) {
                 return false;
             } else {
-                float densityLevel = EnchantmentHelper.getLevel(world.getRegistryManager().getEntryOrThrow(Enchantments.DENSITY), stack);
-                if (stack.willBreakNextUse()) {
+                float densityLevel = EnchantmentHelper.getItemEnchantmentLevel(world.registryAccess().getOrThrow(Enchantments.DENSITY), stack);
+                if (stack.nextDamageWillBreak()) {
                     return false;
                 } else {
-                    RegistryEntry<SoundEvent> registryEntry = EnchantmentHelper.getEffect(stack, EnchantmentEffectComponentTypes.TRIDENT_SOUND)
-                            .orElse(SoundEvents.ITEM_TRIDENT_THROW);
-                    playerEntity.incrementStat(Stats.USED.getOrCreateStat(this));
-                    if (world instanceof ServerWorld serverWorld) {
-                        stack.damage(3, playerEntity);
-                        ItemStack itemStack = stack.splitUnlessCreative(1, playerEntity);
+                    Holder<SoundEvent> registryEntry = EnchantmentHelper.pickHighestLevel(stack, EnchantmentEffectComponents.TRIDENT_SOUND)
+                            .orElse(SoundEvents.TRIDENT_THROW);
+                    playerEntity.awardStat(Stats.ITEM_USED.get(this));
+                    if (world instanceof ServerLevel serverWorld) {
+                        stack.hurtWithoutBreaking(3, playerEntity);
+                        ItemStack itemStack = stack.consumeAndReturn(1, playerEntity);
 
                         float throwSpeed = DEFAULT_THROW_SPEED - (densityLevel * 0.1F) - (Math.signum(densityLevel) * 0.15F);
-                        if ((world.isThundering() && world.isSkyVisible(user.getBlockPos()) && hasChanneling(serverWorld, stack))) { throwSpeed += 0.85F; }
-                        MaceEntity maceEntity = ProjectileEntity.spawnWithVelocity(MaceEntity::new, serverWorld, itemStack, playerEntity, 0.0F, throwSpeed, 1.0F);
+                        if ((world.isThundering() && world.canSeeSky(user.blockPosition()) && hasChanneling(serverWorld, stack))) { throwSpeed += 0.85F; }
+                        ThrownMace maceEntity = Projectile.spawnProjectileFromRotation(ThrownMace::new, serverWorld, itemStack, playerEntity, 0.0F, throwSpeed, 1.0F);
 
-                        if (playerEntity.isInCreativeMode()) {
-                            maceEntity.pickupType = PersistentProjectileEntity.PickupPermission.CREATIVE_ONLY;
+                        if (playerEntity.hasInfiniteMaterials()) {
+                            maceEntity.pickup = AbstractArrow.Pickup.CREATIVE_ONLY;
                         }
 
-                        world.playSoundFromEntity(null, maceEntity, registryEntry.value(), SoundCategory.PLAYERS, 1.0F, 0.6F);
+                        world.playSound(null, maceEntity, registryEntry.value(), SoundSource.PLAYERS, 1.0F, 0.6F);
                         return true;
                     }
                     return false;
@@ -123,109 +126,111 @@ public class HurlMaceItem extends Item implements ProjectileItem {
     }
 
     @Override
-    public ActionResult use(World world, PlayerEntity user, Hand hand) {
-        ItemStack itemStack = user.getStackInHand(hand);
-        if (itemStack.willBreakNextUse() || user.getOffHandStack().isOf(Items.WIND_CHARGE)) {
-            return ActionResult.FAIL;
+    public InteractionResult use(Level world, Player user, InteractionHand hand) {
+        ItemStack itemStack = user.getItemInHand(hand);
+        if (itemStack.nextDamageWillBreak() || user.getOffhandItem().is(Items.WIND_CHARGE)) {
+            return InteractionResult.FAIL;
         } else {
-            user.setCurrentHand(hand);
-            return ActionResult.CONSUME;
+            user.startUsingItem(hand);
+            return InteractionResult.CONSUME;
         }
     }
 
     @Override
-    public ProjectileEntity createEntity(World world, Position pos, ItemStack stack, Direction direction) {
-        MaceEntity maceEntity = new MaceEntity(world, pos.getX(), pos.getY(), pos.getZ(), stack.copyWithCount(1));
-        maceEntity.pickupType = PersistentProjectileEntity.PickupPermission.ALLOWED;
+    public Projectile asProjectile(Level world, Position pos, ItemStack stack, Direction direction) {
+        ThrownMace maceEntity = new ThrownMace(world, pos.x(), pos.y(), pos.z(), stack.copyWithCount(1));
+        maceEntity.pickup = AbstractArrow.Pickup.ALLOWED;
         return maceEntity;
     }
 
     @Override
-    public void postHit(ItemStack stack, LivingEntity target, LivingEntity attacker) {
-        if (shouldDealAdditionalDamage(attacker)) {
-            ServerWorld serverWorld = (ServerWorld)attacker.getEntityWorld();
-            attacker.setVelocity(attacker.getVelocity().withAxis(Direction.Axis.Y, 0.01F));
-            if (attacker instanceof ServerPlayerEntity serverPlayerEntity) {
-                serverPlayerEntity.currentExplosionImpactPos = this.getCurrentExplosionImpactPos(serverPlayerEntity);
-                serverPlayerEntity.setIgnoreFallDamageFromCurrentExplosion(true);
-                serverPlayerEntity.networkHandler.sendPacket(new EntityVelocityUpdateS2CPacket(serverPlayerEntity));
+    public void hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
+        if (canSmashAttack(attacker)) {
+            ServerLevel level = (ServerLevel)attacker.level();
+            attacker.setDeltaMovement(attacker.getDeltaMovement().with(Direction.Axis.Y, 0.01F));
+            attacker.setIgnoreFallDamageFromCurrentImpulse(
+                    true,
+                    attacker.isIgnoringFallDamageFromCurrentImpulse() && attacker.currentImpulseImpactPos.y <= attacker.position().y ? attacker.currentImpulseImpactPos : attacker.position()
+            );
+            if (attacker instanceof ServerPlayer player) {
+                player.connection.send(new ClientboundSetEntityMotionPacket(player));
             }
 
             trySpawnChannelingLightningBolt(stack, target, attacker);
 
-            if (target.isOnGround()) {
-                if (attacker instanceof ServerPlayerEntity serverPlayerEntity) {
+            if (target.onGround()) {
+                if (attacker instanceof ServerPlayer serverPlayerEntity) {
                     serverPlayerEntity.setSpawnExtraParticlesOnFall(true);
                 }
 
-                SoundEvent soundEvent = attacker.fallDistance > HEAVY_SMASH_SOUND_FALL_DISTANCE_THRESHOLD ? SoundEvents.ITEM_MACE_SMASH_GROUND_HEAVY : SoundEvents.ITEM_MACE_SMASH_GROUND;
-                serverWorld.playSound(null, attacker.getX(), attacker.getY(), attacker.getZ(), soundEvent, attacker.getSoundCategory(), 1.0F, 1.0F);
+                SoundEvent soundEvent = attacker.fallDistance > HEAVY_SMASH_SOUND_FALL_DISTANCE_THRESHOLD ? SoundEvents.MACE_SMASH_GROUND_HEAVY : SoundEvents.MACE_SMASH_GROUND;
+                level.playSound(null, attacker.getX(), attacker.getY(), attacker.getZ(), soundEvent, attacker.getSoundSource(), 1.0F, 1.0F);
             } else {
-                serverWorld.playSound(null, attacker.getX(), attacker.getY(), attacker.getZ(), SoundEvents.ITEM_MACE_SMASH_AIR, attacker.getSoundCategory(), 1.0F, 1.0F);
+                level.playSound(null, attacker.getX(), attacker.getY(), attacker.getZ(), SoundEvents.MACE_SMASH_AIR, attacker.getSoundSource(), 1.0F, 1.0F);
             }
 
-            knockbackNearbyEntities(serverWorld, attacker, target);
+            knockbackNearbyEntities(level, attacker, target);
         }
     }
 
-    public static boolean hasChanneling(ServerWorld world, ItemStack stack) {
-        return EnchantmentHelper.getLevel(world.getRegistryManager().getEntryOrThrow(Enchantments.CHANNELING), stack) != 0;
+    public static boolean hasChanneling(ServerLevel world, ItemStack stack) {
+        return EnchantmentHelper.getItemEnchantmentLevel(world.registryAccess().getOrThrow(Enchantments.CHANNELING), stack) != 0;
     }
 
     public static void trySpawnChannelingLightningBolt (ItemStack stack, LivingEntity target, Entity attacker) {
-        trySpawnChannelingLightningBolt(stack, target.getBlockPos(), attacker);
+        trySpawnChannelingLightningBolt(stack, target.blockPosition(), attacker);
     }
 
     public static void trySpawnChannelingLightningBolt (ItemStack stack, BlockPos pos, Entity attackSource) {
         LivingEntity attacker;
-        if (attackSource instanceof ServerPlayerEntity serverPlayerEntity) {
+        if (attackSource instanceof ServerPlayer serverPlayerEntity) {
             attacker = serverPlayerEntity;
         } else {
-            attacker = (LivingEntity) ((PersistentProjectileEntity) attackSource).getOwner();
+            attacker = (LivingEntity) ((AbstractArrow) attackSource).getOwner();
         }
 
         if (attacker != null) {
-            if (attacker.getEntityWorld() instanceof ServerWorld world) {
-                if (world.isThundering() && world.isSkyVisible(pos) && hasChanneling(world, stack)) {
-                    LightningEntity lightningEntity = (EntityType.LIGHTNING_BOLT).spawn(world, pos, SpawnReason.TRIGGERED);
+            if (attacker.level() instanceof ServerLevel world) {
+                if (world.isThundering() && world.canSeeSky(pos) && hasChanneling(world, stack)) {
+                    LightningBolt lightningEntity = (EntityType.LIGHTNING_BOLT).spawn(world, pos, EntitySpawnReason.TRIGGERED);
                     if (lightningEntity != null) {
-                        if (attacker instanceof ServerPlayerEntity serverPlayerEntity) {
-                            lightningEntity.setChanneler(serverPlayerEntity);
-                            world.playSoundClient(pos.getX(), pos.getY(), pos.getZ(), SoundEvents.ITEM_TRIDENT_THUNDER.value(), SoundCategory.WEATHER, 10.0F,
+                        if (attacker instanceof ServerPlayer serverPlayerEntity) {
+                            lightningEntity.setCause(serverPlayerEntity);
+                            world.playLocalSound(pos.getX(), pos.getY(), pos.getZ(), SoundEvents.TRIDENT_THUNDER.value(), SoundSource.WEATHER, 10.0F,
                                     1.0f,
                                     false);
                         }
 
-                        if (attacker.getScoreboardTeam() != null) {
-                            attacker.getEntityWorld().getScoreboard().addScoreHolderToTeam(lightningEntity.getNameForScoreboard(), attacker.getScoreboardTeam());
+                        if (attacker.getTeam() != null) {
+                            attacker.level().getScoreboard().addPlayerToTeam(lightningEntity.getScoreboardName(), attacker.getTeam());
                         }
 
-                        lightningEntity.refreshPositionAndAngles(pos.getX(), pos.getY(), pos.getZ(), lightningEntity.getYaw(), lightningEntity.getPitch());
+                        lightningEntity.snapTo(pos.getX(), pos.getY(), pos.getZ(), lightningEntity.getYRot(), lightningEntity.getXRot());
                     }
                 }
             }
         }
     }
 
-    private Vec3d getCurrentExplosionImpactPos(ServerPlayerEntity player) {
-        return player.shouldIgnoreFallDamageFromCurrentExplosion()
-                && player.currentExplosionImpactPos != null
-                && player.currentExplosionImpactPos.y <= player.getEntityPos().y
-                ? player.currentExplosionImpactPos
-                : player.getEntityPos();
+    private Vec3 getCurrentExplosionImpactPos(ServerPlayer player) {
+        return player.isIgnoringFallDamageFromCurrentImpulse()
+                && player.currentImpulseImpactPos != null
+                && player.currentImpulseImpactPos.y <= player.position().y
+                ? player.currentImpulseImpactPos
+                : player.position();
     }
 
     @Override
-    public void postDamageEntity(ItemStack stack, LivingEntity target, LivingEntity attacker) {
-        if (shouldDealAdditionalDamage(attacker)) {
-            attacker.onLanding();
+    public void postHurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
+        if (canSmashAttack(attacker)) {
+            attacker.resetFallDistance();
         }
     }
 
     @Override
-    public float getBonusAttackDamage(Entity target, float baseAttackDamage, DamageSource damageSource) {
-        if (damageSource.getSource() instanceof LivingEntity livingEntity) {
-            if (!shouldDealAdditionalDamage(livingEntity)) {
+    public float getAttackDamageBonus(Entity target, float baseAttackDamage, DamageSource damageSource) {
+        if (damageSource.getDirectEntity() instanceof LivingEntity livingEntity) {
+            if (!canSmashAttack(livingEntity)) {
                 return 0.0F;
             } else {
                 double d = 3.0;
@@ -240,8 +245,8 @@ public class HurlMaceItem extends Item implements ProjectileItem {
                     g = 22.0 + f - 8.0;
                 }
 
-                return livingEntity.getEntityWorld() instanceof ServerWorld serverWorld
-                        ? (float)(g + EnchantmentHelper.getSmashDamagePerFallenBlock(serverWorld, livingEntity.getWeaponStack(), target, damageSource, 0.0F) * f)
+                return livingEntity.level() instanceof ServerLevel serverWorld
+                        ? (float)(g + EnchantmentHelper.modifyFallBasedDamage(serverWorld, livingEntity.getWeaponItem(), target, damageSource, 0.0F) * f)
                         : (float)g;
             }
         } else {
@@ -249,42 +254,42 @@ public class HurlMaceItem extends Item implements ProjectileItem {
         }
     }
 
-    private static void knockbackNearbyEntities(World world, Entity attacker, Entity attacked) {
-        world.syncWorldEvent(WorldEvents.SMASH_ATTACK, attacked.getSteppingPos(), 750);
-        world.getEntitiesByClass(LivingEntity.class, attacked.getBoundingBox().expand(KNOCKBACK_RANGE), getKnockbackPredicate(attacker, attacked)).forEach(entity -> {
-            Vec3d vec3d = entity.getEntityPos().subtract(attacked.getEntityPos());
+    private static void knockbackNearbyEntities(Level world, Entity attacker, Entity attacked) {
+        world.levelEvent(LevelEvent.PARTICLES_SMASH_ATTACK, attacked.getOnPos(), 750);
+        world.getEntitiesOfClass(LivingEntity.class, attacked.getBoundingBox().inflate(KNOCKBACK_RANGE), getKnockbackPredicate(attacker, attacked)).forEach(entity -> {
+            Vec3 vec3d = entity.position().subtract(attacked.position());
             double d = getKnockback(attacker, entity, vec3d);
-            Vec3d vec3d2 = vec3d.normalize().multiply(d);
+            Vec3 vec3d2 = vec3d.normalize().scale(d);
             if (d > 0.0) {
-                entity.addVelocity(vec3d2.x, KNOCKBACK_POWER, vec3d2.z);
-                if (entity instanceof ServerPlayerEntity serverPlayerEntity) {
-                    serverPlayerEntity.networkHandler.sendPacket(new EntityVelocityUpdateS2CPacket(serverPlayerEntity));
+                entity.push(vec3d2.x, KNOCKBACK_POWER, vec3d2.z);
+                if (entity instanceof ServerPlayer serverPlayerEntity) {
+                    serverPlayerEntity.connection.send(new ClientboundSetEntityMotionPacket(serverPlayerEntity));
                 }
             }
         });
     }
 
-    public static void knockbackNearbyEntitiesThrown(World world, PersistentProjectileEntity attacker) {
-        world.syncWorldEvent(WorldEvents.SMASH_ATTACK, attacker.getSteppingPos(), 750);
-        world.getEntitiesByClass(LivingEntity.class, attacker.getBoundingBox().expand(KNOCKBACK_RANGE), getKnockbackPredicateThrown(attacker)).forEach(entity -> {
-            Vec3d vec3d = entity.getEntityPos().subtract(attacker.getEntityPos());
+    public static void knockbackNearbyEntitiesThrown(Level world, AbstractArrow attacker) {
+        world.levelEvent(LevelEvent.PARTICLES_SMASH_ATTACK, attacker.getOnPos(), 750);
+        world.getEntitiesOfClass(LivingEntity.class, attacker.getBoundingBox().inflate(KNOCKBACK_RANGE), getKnockbackPredicateThrown(attacker)).forEach(entity -> {
+            Vec3 vec3d = entity.position().subtract(attacker.position());
             double d = getKnockback(attacker, entity, vec3d);
-            Vec3d vec3d2 = vec3d.normalize().multiply(d);
+            Vec3 vec3d2 = vec3d.normalize().scale(d);
             if (d > 0.0) {
-                entity.addVelocity(vec3d2.x, KNOCKBACK_POWER, vec3d2.z);
-                if (entity instanceof ServerPlayerEntity serverPlayerEntity) {
-                    serverPlayerEntity.networkHandler.sendPacket(new EntityVelocityUpdateS2CPacket(serverPlayerEntity));
+                entity.push(vec3d2.x, KNOCKBACK_POWER, vec3d2.z);
+                if (entity instanceof ServerPlayer serverPlayerEntity) {
+                    serverPlayerEntity.connection.send(new ClientboundSetEntityMotionPacket(serverPlayerEntity));
                 }
             }
         });
     }
 
-    private static Predicate<LivingEntity> getKnockbackPredicateThrown(PersistentProjectileEntity attacker) {
+    private static Predicate<LivingEntity> getKnockbackPredicateThrown(AbstractArrow attacker) {
         return entity -> {
             boolean bl = !entity.isSpectator();
-            boolean bl2 = !attacker.isTeammate(entity);
+            boolean bl2 = !attacker.isAlliedTo(entity);
             boolean bl3 = attacker.getOwner() != entity;
-            boolean bl4 = !(entity instanceof ArmorStandEntity armorStandEntity && armorStandEntity.isMarker());
+            boolean bl4 = !(entity instanceof ArmorStand armorStandEntity && armorStandEntity.isMarker());
             return bl && bl2 && bl3 && bl4;
         };
     }
@@ -293,30 +298,28 @@ public class HurlMaceItem extends Item implements ProjectileItem {
         return entity -> {
             boolean bl = !entity.isSpectator();
             boolean bl2 = entity != attacker && entity != attacked;
-            boolean bl3 = !attacker.isTeammate(entity);
+            boolean bl3 = !attacker.isAlliedTo(entity);
             boolean bl4 = !(
-                    entity instanceof TameableEntity tameableEntity
+                    entity instanceof TamableAnimal tameableEntity
                             && attacked instanceof LivingEntity livingEntity
-                            && tameableEntity.isTamed()
-                            && tameableEntity.isOwner(livingEntity)
+                            && tameableEntity.isTame()
+                            && tameableEntity.isOwnedBy(livingEntity)
             );
-            boolean bl5 = !(entity instanceof ArmorStandEntity armorStandEntity && armorStandEntity.isMarker());
-            boolean bl6 = attacked.squaredDistanceTo(entity) <= Math.pow(KNOCKBACK_RANGE, 2.0);
+            boolean bl5 = !(entity instanceof ArmorStand armorStandEntity && armorStandEntity.isMarker());
+            boolean bl6 = attacked.distanceToSqr(entity) <= Math.pow(KNOCKBACK_RANGE, 2.0);
             return bl && bl2 && bl3 && bl4 && bl5 && bl6;
         };
     }
 
-    private static double getKnockback(Entity attacker, LivingEntity attacked, Vec3d distance) {
-        return (KNOCKBACK_RANGE - distance.length()) * KNOCKBACK_POWER * (attacker.fallDistance > 5.0 ? 2 : 1) * (1.0 - attacked.getAttributeValue(EntityAttributes.KNOCKBACK_RESISTANCE));
+    private static double getKnockback(Entity attacker, LivingEntity attacked, Vec3 distance) {
+        return (KNOCKBACK_RANGE - distance.length()) * KNOCKBACK_POWER * (attacker.fallDistance > 5.0 ? 2 : 1) * (1.0 - attacked.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE));
     }
 
-    public static boolean shouldDealAdditionalDamage(LivingEntity attacker) {
-        return attacker.fallDistance > 1.5 && !attacker.isGliding();
+    public static boolean canSmashAttack(LivingEntity attacker) {
+        return attacker.fallDistance > 1.5 && !attacker.isFallFlying();
     }
 
-    @Nullable
-    @Override
-    public DamageSource getDamageSource(LivingEntity user) {
-        return shouldDealAdditionalDamage(user) ? user.getDamageSources().maceSmash(user) : super.getDamageSource(user);
+    public @Nullable DamageSource getItemDamageSource(final LivingEntity attacker) {
+        return canSmashAttack(attacker) ? attacker.damageSources().mace(attacker) : super.getItemDamageSource(attacker);
     }
 }

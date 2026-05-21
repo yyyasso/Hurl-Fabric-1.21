@@ -3,32 +3,39 @@ package net.yyasso.hurl.render;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.model.*;
-import net.minecraft.client.render.RenderLayers;
-import net.minecraft.client.render.entity.model.EntityModelLayer;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.model.geom.ModelLayerLocation;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.geom.PartPose;
+import net.minecraft.client.model.geom.builders.CubeDeformation;
+import net.minecraft.client.model.geom.builders.CubeListBuilder;
+import net.minecraft.client.model.geom.builders.LayerDefinition;
+import net.minecraft.client.model.geom.builders.MeshDefinition;
+import net.minecraft.client.model.geom.builders.PartDefinition;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Unit;
 import net.yyasso.hurl.Hurl;
 
 // Made with Blockbench 4.12.6
 @Environment(EnvType.CLIENT)
 public class MaceEntityModel extends Model<Unit> {
-    public static final Identifier TEXTURE = Identifier.of(Hurl.MOD_ID, "textures/entity/mace.png");
-    public static final EntityModelLayer MODEL_LAYER = new EntityModelLayer(Identifier.of(Hurl.MOD_ID, "mace"), "main");
+    public static final Identifier TEXTURE = Identifier.fromNamespaceAndPath(Hurl.MOD_ID, "textures/entity/mace.png");
+    public static final ModelLayerLocation MODEL_LAYER = new ModelLayerLocation(Identifier.fromNamespaceAndPath(Hurl.MOD_ID, "mace"), "main");
 
     public MaceEntityModel(ModelPart root)  {
-        super(root, RenderLayers::entitySolid);
+        super(root, RenderTypes::entitySolid);
     }
 
-    public static TexturedModelData getTexturedModelData() {
-        ModelData modelData = new ModelData();
-        ModelPartData modelPartData = modelData.getRoot();
+    public static LayerDefinition getTexturedModelData() {
+        MeshDefinition modelData = new MeshDefinition();
+        PartDefinition modelPartData = modelData.getRoot();
 
-        ModelPartData bb_main = modelPartData.addChild("bb_main", ModelPartBuilder.create()
-                .uv(0, 0).cuboid(-4.0F, 0.0F, -4.0F, 8.0F, 8.0F, 8.0F, new Dilation(0.0F))
-                .uv(0, 14).cuboid(-1.0F, 8.0F, -1.0F, 2.0F, 8.0F, 2.0F, new Dilation(0.0F))
-                .uv(8, 16).cuboid(-1.5F, 16.0F, -1.5F, 3.0F, 2.0F, 3.0F, new Dilation(0.0F)), ModelTransform.rotation(0.0F, 24.0F, 0.0F));
+        PartDefinition bb_main = modelPartData.addOrReplaceChild("bb_main", CubeListBuilder.create()
+                .texOffs(0, 0).addBox(-4.0F, 0.0F, -4.0F, 8.0F, 8.0F, 8.0F, new CubeDeformation(0.0F))
+                .texOffs(0, 14).addBox(-1.0F, 8.0F, -1.0F, 2.0F, 8.0F, 2.0F, new CubeDeformation(0.0F))
+                .texOffs(8, 16).addBox(-1.5F, 16.0F, -1.5F, 3.0F, 2.0F, 3.0F, new CubeDeformation(0.0F)), PartPose.rotation(0.0F, 24.0F, 0.0F));
 
-        bb_main.addChild("top_r1", ModelPartBuilder.create().uv(24, 4).cuboid(-2.0F, -2.0F, -2.0F, 2.0F, 2.0F, 2.0F, new Dilation(0.0F)), ModelTransform.of(1.0F, 1.0F, 0.0F, -0.7854F, 0.0F, 0.0F));
-        return TexturedModelData.of(modelData, 32, 32);
+        bb_main.addOrReplaceChild("top_r1", CubeListBuilder.create().texOffs(24, 4).addBox(-2.0F, -2.0F, -2.0F, 2.0F, 2.0F, 2.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(1.0F, 1.0F, 0.0F, -0.7854F, 0.0F, 0.0F));
+        return LayerDefinition.create(modelData, 32, 32);
     }
 }

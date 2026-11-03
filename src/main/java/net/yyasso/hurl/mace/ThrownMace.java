@@ -18,6 +18,7 @@ import net.minecraft.util.random.WeightedList;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
@@ -39,6 +40,7 @@ import net.yyasso.hurl.registry.HurlDamageTypes;
 import net.yyasso.hurl.registry.HurlEntityType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -214,7 +216,7 @@ public class ThrownMace extends AbstractArrow {
         this.dealtDamage = true;
         // TutorialMod.LOGGER.info("Damage {}", String.valueOf(f));
         if (entity.hurtOrSimulate(damageSource, f)) {
-            if (entity.getType() == EntityType.ENDERMAN) {
+            if (entity.getType() == EntityTypes.ENDERMAN) {
                 return;
             }
 

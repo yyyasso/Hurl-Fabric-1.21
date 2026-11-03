@@ -2,10 +2,8 @@ package net.yyasso.hurl.mace;
 
 import java.util.List;
 import java.util.function.Predicate;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Holder;
-import net.minecraft.core.Position;
+
+import net.minecraft.core.*;
 import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -16,13 +14,7 @@ import net.minecraft.stats.Stats;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntitySpawnReason;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.EquipmentSlotGroup;
-import net.minecraft.world.entity.LightningBolt;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -44,6 +36,7 @@ import net.minecraft.world.level.block.LevelEvent;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 public class HurlMaceItem extends Item implements ProjectileItem {
     private static final int DEFAULT_ATTACK_DAMAGE = 5;
@@ -84,12 +77,12 @@ public class HurlMaceItem extends Item implements ProjectileItem {
     }
 
     @Override
-    public int getUseDuration(ItemStack stack, LivingEntity user) {
+    public int getUseDuration(@NonNull ItemStack stack, @NonNull LivingEntity user) {
         return 72000;
     }
 
     @Override
-    public boolean releaseUsing(ItemStack stack, Level world, LivingEntity user, int remainingUseTicks) {
+    public boolean releaseUsing(@NonNull ItemStack stack, @NonNull Level world, @NonNull LivingEntity user, int remainingUseTicks) {
         if (user instanceof Player playerEntity) {
             int i = this.getUseDuration(stack, user) - remainingUseTicks;
             if (i < 10) {
@@ -126,7 +119,7 @@ public class HurlMaceItem extends Item implements ProjectileItem {
     }
 
     @Override
-    public InteractionResult use(Level world, Player user, InteractionHand hand) {
+    public @NonNull InteractionResult use(@NonNull Level world, Player user, @NonNull InteractionHand hand) {
         ItemStack itemStack = user.getItemInHand(hand);
         if (itemStack.nextDamageWillBreak() || user.getOffhandItem().is(Items.WIND_CHARGE)) {
             return InteractionResult.FAIL;
@@ -137,14 +130,14 @@ public class HurlMaceItem extends Item implements ProjectileItem {
     }
 
     @Override
-    public Projectile asProjectile(Level world, Position pos, ItemStack stack, Direction direction) {
+    public @NonNull Projectile asProjectile(@NonNull Level world, Position pos, ItemStack stack, @NonNull Direction direction) {
         ThrownMace maceEntity = new ThrownMace(world, pos.x(), pos.y(), pos.z(), stack.copyWithCount(1));
         maceEntity.pickup = AbstractArrow.Pickup.ALLOWED;
         return maceEntity;
     }
 
     @Override
-    public void hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
+    public void hurtEnemy(@NonNull ItemStack stack, @NonNull LivingEntity target, @NonNull LivingEntity attacker) {
         if (canSmashAttack(attacker)) {
             ServerLevel level = (ServerLevel)attacker.level();
             attacker.setDeltaMovement(attacker.getDeltaMovement().with(Direction.Axis.Y, 0.01F));
@@ -190,22 +183,24 @@ public class HurlMaceItem extends Item implements ProjectileItem {
         }
 
         if (attacker != null) {
-            if (attacker.level() instanceof ServerLevel world) {
-                if (world.isThundering() && world.canSeeSky(pos) && hasChanneling(world, stack)) {
-                    LightningBolt lightningEntity = (EntityType.LIGHTNING_BOLT).spawn(world, pos, EntitySpawnReason.TRIGGERED);
-                    if (lightningEntity != null) {
+            if (attacker.level() instanceof ServerLevel level) {
+                if (level.isThundering() && level.canSeeSky(pos) && hasChanneling(level, stack)) {
+                    LightningBolt lightningBolt = EntityTypes.LIGHTNING_BOLT.create(level, EntitySpawnReason.TRIGGERED);
+                    if (lightningBolt != null) {
+                        lightningBolt.setPos(pos.getX(), pos.getY(), pos.getZ());
                         if (attacker instanceof ServerPlayer serverPlayerEntity) {
-                            lightningEntity.setCause(serverPlayerEntity);
-                            world.playLocalSound(pos.getX(), pos.getY(), pos.getZ(), SoundEvents.TRIDENT_THUNDER.value(), SoundSource.WEATHER, 10.0F,
+                            lightningBolt.setCause(serverPlayerEntity);
+                            level.addFreshEntity(lightningBolt);
+                            level.playLocalSound(pos.getX(), pos.getY(), pos.getZ(), SoundEvents.TRIDENT_THUNDER.value(), SoundSource.WEATHER, 10.0F,
                                     1.0f,
                                     false);
                         }
 
                         if (attacker.getTeam() != null) {
-                            attacker.level().getScoreboard().addPlayerToTeam(lightningEntity.getScoreboardName(), attacker.getTeam());
+                            attacker.level().getScoreboard().addPlayerToTeam(lightningBolt.getScoreboardName(), attacker.getTeam());
                         }
 
-                        lightningEntity.snapTo(pos.getX(), pos.getY(), pos.getZ(), lightningEntity.getYRot(), lightningEntity.getXRot());
+                        lightningBolt.snapTo(pos.getX(), pos.getY(), pos.getZ(), lightningBolt.getYRot(), lightningBolt.getXRot());
                     }
                 }
             }
@@ -221,14 +216,14 @@ public class HurlMaceItem extends Item implements ProjectileItem {
     }
 
     @Override
-    public void postHurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
+    public void postHurtEnemy(@NonNull ItemStack stack, @NonNull LivingEntity target, @NonNull LivingEntity attacker) {
         if (canSmashAttack(attacker)) {
             attacker.resetFallDistance();
         }
     }
 
     @Override
-    public float getAttackDamageBonus(Entity target, float baseAttackDamage, DamageSource damageSource) {
+    public float getAttackDamageBonus(@NonNull Entity target, float baseAttackDamage, DamageSource damageSource) {
         if (damageSource.getDirectEntity() instanceof LivingEntity livingEntity) {
             if (!canSmashAttack(livingEntity)) {
                 return 0.0F;
@@ -319,7 +314,7 @@ public class HurlMaceItem extends Item implements ProjectileItem {
         return attacker.fallDistance > 1.5 && !attacker.isFallFlying();
     }
 
-    public @Nullable DamageSource getItemDamageSource(final LivingEntity attacker) {
+    public @Nullable DamageSource getItemDamageSource(final @NonNull LivingEntity attacker) {
         return canSmashAttack(attacker) ? attacker.damageSources().mace(attacker) : super.getItemDamageSource(attacker);
     }
 }
